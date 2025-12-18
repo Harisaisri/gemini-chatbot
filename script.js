@@ -10,16 +10,6 @@ let controller, typingInterval;
 const chatHistory = [];
 const userData = { message: "", file: {} };
 
-// 🔐 Get API key safely (runtime only)
-function getApiKey() {
-  let key = sessionStorage.getItem("GEMINI_API_KEY");
-  if (!key) {
-    key = prompt("Enter your Gemini API key:");
-    sessionStorage.setItem("GEMINI_API_KEY", key);
-  }
-  return key;
-}
-
 // Theme
 const isLightTheme = localStorage.getItem("themeColor") === "light_mode";
 document.body.classList.toggle("light-theme", isLightTheme);
@@ -54,7 +44,9 @@ const typingEffect = (text, el, botDiv) => {
   }, 40);
 };
 
-// API call
+// --------------------
+// API call via backend
+// --------------------
 async function generateResponse(botMsgDiv) {
   const textElement = botMsgDiv.querySelector(".message-text");
   controller = new AbortController();
@@ -65,21 +57,27 @@ async function generateResponse(botMsgDiv) {
   });
 
   try {
-    const API_KEY = getApiKey();
-    const API_URL =
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
-
-    const res = await fetch(API_URL, {
+    // Call backend endpoint
+    const res = await fetch("http://localhost:3000/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: chatHistory }),
+      body: JSON.stringify({ chatHistory }),
       signal: controller.signal
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error.message);
+    console.log("Backend response:", data); // optional: check structure
 
-    const reply = data.candidates[0].content.parts[0].text.trim();
+    // Safely extract reply
+    let reply = "";
+    if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      reply = data.candidates[0].content.parts[0].text.trim();
+    } else if (data?.error?.message) {
+      reply = `Error: ${data.error.message}`;
+    } else {
+      reply = "Sorry, no response received.";
+    }
+
     typingEffect(reply, textElement, botMsgDiv);
 
     chatHistory.push({
